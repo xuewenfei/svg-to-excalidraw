@@ -14,16 +14,19 @@ import {
 	createExEllipse,
 	createExLine,
 	createExRect,
+	createExText,
 	type ExcalidrawDraw,
 	type ExcalidrawElementBase,
 	type ExcalidrawEllipse,
 	type ExcalidrawLine,
 	type ExcalidrawRectangle,
+	type ExcalidrawText,
 	type Point,
 } from './elements/ExcalidrawElement.ts'
 import ExcalidrawScene from './elements/ExcalidrawScene.ts'
 import Group, { getGroupAttrs } from './elements/Group.ts'
 import { getTransformMatrix, transformPoints } from './transform.ts'
+import type { FontFamily, TextAlign } from './types.ts'
 import { dimensionsFromPoints, getWindingOrder, randomId } from './utils.ts'
 
 const SUPPORTED_TAGS = [
@@ -36,7 +39,31 @@ const SUPPORTED_TAGS = [
 	'rect',
 	'polyline',
 	'polygon',
+	'text',
 ]
+
+const mapTextAnchor = (anchor: string): TextAlign => {
+	if (anchor === 'middle') return 'center'
+	if (anchor === 'end') return 'right'
+	return 'left'
+}
+
+const mapFontFamily = (family: string): FontFamily => {
+	const lower = family.toLowerCase()
+	if (
+		lower.includes('mono') ||
+		lower.includes('cascadia') ||
+		lower.includes('courier') ||
+		lower.includes('consolas')
+	) {
+		return 3
+	}
+	if (lower.includes('virgil') || lower.includes('hand') || lower === '') {
+		// Default sans-serif fallback for typical web SVGs.
+		return 2
+	}
+	return 2
+}
 
 const nodeValidator = (node: Node): number => {
 	// Only accept Element nodes (nodeType 1), not text nodes, comments, etc.
@@ -397,6 +424,77 @@ const walkers = {
 		scene.elements.push(rect)
 
 		walk(args, args.tw.nextNode())
+	},
+
+	text: (args: WalkerArgs) => {
+		const { tw, scene, groups } = args
+		const el = tw.currentNode as Element
+
+		const rawText = (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+		if (!rawText) {
+			walk(args, tw.nextNode())
+			return
+		}
+
+		const fontSize = getNum(el, 'font-size', 16) || 16
+		const fontFamily = mapFontFamily(get(el, 'font-family'))
+		const textAlign = mapTextAnchor(get(el, 'text-anchor', 'start'))
+
+		// SVG text y is on the baseline; Excalidraw y is top of the box.
+		const baseline = Math.round(fontSize * 0.85)
+		const lineHeight = Math.round(fontSize * 1.2)
+		const approxCharWidth = fontSize * 0.55
+		const width = Math.max(rawText.length * approxCharWidth, fontSize)
+
+		const svgX = getNum(el, 'x', 0)
+		const svgY = getNum(el, 'y', 0)
+		// Anchor offset so the SVG anchor lands at the intended point.
+		const anchorOffset =
+			textAlign === 'center' ? width / 2 : textAlign === 'right' ? width : 0
+		const topLeftX = svgX - anchorOffset
+		const topLeftY = svgY - baseline
+
+		const mat = getTransformMatrix(el, groups)
+		const m = mat4.fromValues(
+			1,
+			0,
+			0,
+			0,
+			0,
+			1,
+			0,
+			0,
+			0,
+			0,
+			1,
+			0,
+			topLeftX,
+			topLeftY,
+			0,
+			1,
+		)
+		const result = mat4.multiply(mat4.create(), mat, m)
+
+		const textEl: ExcalidrawText = {
+			...createExText(),
+			...presAttrs(el, groups),
+			x: result[12],
+			y: result[13],
+			width,
+			height: lineHeight,
+			text: rawText,
+			fontSize,
+			fontFamily,
+			textAlign,
+			baseline,
+			strokeColor: get(el, 'fill', '#000000') || '#000000',
+			backgroundColor: 'transparent',
+			groupIds: groups.map((g) => g.id),
+		}
+
+		scene.elements.push(textEl)
+
+		walk(args, tw.nextNode())
 	},
 
 	path: (args: WalkerArgs) => {

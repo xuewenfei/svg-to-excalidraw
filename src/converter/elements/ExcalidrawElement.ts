@@ -1,9 +1,12 @@
 import type {
 	ExcalidrawLinearElement,
 	FillStyle,
+	FontFamily,
 	GroupId,
 	StrokeSharpness,
 	StrokeStyle,
+	TextAlign,
+	VerticalAlign,
 } from '../types.ts'
 import { randomId, randomInteger } from '../utils.ts'
 
@@ -60,10 +63,21 @@ export type ExcalidrawGenericElement =
 	| ExcalidrawEllipse
 	| ExcalidrawLine
 	| ExcalidrawDraw
+	| ExcalidrawText
 
 export type ExcalidrawDraw = ExcalidrawElementBase & {
 	type: 'draw'
 	points: readonly Point[]
+}
+
+export type ExcalidrawText = ExcalidrawElementBase & {
+	type: 'text'
+	fontSize: number
+	fontFamily: FontFamily
+	text: string
+	baseline: number
+	textAlign: TextAlign
+	verticalAlign: VerticalAlign
 }
 
 export function createExElement(): ExcalidrawElementBase {
@@ -118,5 +132,18 @@ export function createExDraw(): ExcalidrawDraw {
 		...createExElement(),
 		type: 'draw',
 		points: [],
+	}
+}
+
+export function createExText(): ExcalidrawText {
+	return {
+		...createExElement(),
+		type: 'text',
+		fontSize: 20,
+		fontFamily: 1,
+		text: '',
+		baseline: 18,
+		textAlign: 'left',
+		verticalAlign: 'top',
 	}
 }

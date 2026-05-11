@@ -1,7 +1,7 @@
-import {describe, expect, test} from 'bun:test'
-import {convert} from '../src/converter'
-import * as fs from "node:fs";
-import path from "node:path";
+import { describe, expect, test } from 'bun:test'
+import * as fs from 'node:fs'
+import path from 'node:path'
+import { convert } from '../src/converter'
 
 describe('SVG to Excalidraw conversion', () => {
 	test('converts a simple circle to Excalidraw format', () => {
@@ -65,10 +65,36 @@ describe('SVG to Excalidraw conversion', () => {
 		expect(result.warnings).toBeArray()
 	})
 
+	test('converts a text element to Excalidraw text', () => {
+		const svgString = `
+      <svg viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
+        <text x="20" y="40" font-size="24" font-family="Helvetica" fill="#333" text-anchor="middle">Hello</text>
+      </svg>
+    `
+
+		const result = convert(svgString)
+
+		expect(result.hasErrors).toBe(false)
+		expect(result.content.elements.length).toBe(1)
+
+		const element = result.content.elements[0] as {
+			type: string
+			text: string
+			fontSize: number
+			textAlign: string
+			strokeColor: string
+		}
+		expect(element.type).toBe('text')
+		expect(element.text).toBe('Hello')
+		expect(element.fontSize).toBe(24)
+		expect(element.textAlign).toBe('center')
+		expect(element.strokeColor).toBe('#333')
+	})
+
 	test.skip('converts ollama file', async () => {
 		const filePath = '/Users/awhiteside/Downloads/ollama_omg.svg'
 		const parsedPath = path.parse(filePath)
-		const svgFileContents = fs.readFileSync(filePath).toString('utf-8');
+		const svgFileContents = fs.readFileSync(filePath).toString('utf-8')
 		const result = convert(svgFileContents)
 		if (result.hasErrors) {
 			console.error(result.errors)

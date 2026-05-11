@@ -1,14 +1,11 @@
 import type { LibraryItem } from '@excalidraw/excalidraw/types'
 
-type Props = {
+export type Props = {
 	name: string
 	elements: LibraryItem['elements']
 }
 
-const createLibraryItem = (
-	name: string,
-	elements: LibraryItem['elements'],
-): LibraryItem => {
+export const createLibraryItem = ({ name, elements }: Props): LibraryItem => {
 	return {
 		id: name,
 		name,
