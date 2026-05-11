@@ -91,8 +91,8 @@ describe('SVG to Excalidraw conversion', () => {
 		expect(element.strokeColor).toBe('#333')
 	})
 
-	test.skip('converts ollama file', async () => {
-		const filePath = '/Users/awhiteside/Downloads/creative-thinking-card.svg'
+	test.only('converts ollama file', async () => {
+		const filePath = '/Users/awhiteside/Downloads/skeleton-loader.svg'
 		const parsedPath = path.parse(filePath)
 		const svgFileContents = fs.readFileSync(filePath).toString('utf-8')
 		const result = convert(svgFileContents)

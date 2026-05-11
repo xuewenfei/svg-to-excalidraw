@@ -39,6 +39,7 @@ const SUPPORTED_TAGS = [
 	'rect',
 	'polyline',
 	'polygon',
+	'line',
 	'text',
 ]
 
@@ -307,7 +308,45 @@ const walkers = {
 	},
 
 	line: (args: WalkerArgs) => {
-		// unimplemented
+		const { tw, scene, groups } = args
+		const el = tw.currentNode as Element
+
+		const x1 = getNum(el, 'x1', 0)
+		const y1 = getNum(el, 'y1', 0)
+		const x2 = getNum(el, 'x2', 0)
+		const y2 = getNum(el, 'y2', 0)
+
+		const mat = getTransformMatrix(el, groups)
+		const [p1, p2] = transformPoints(
+			[
+				[x1, y1],
+				[x2, y2],
+			],
+			mat,
+		)
+
+		const x = p1[0]
+		const y = p1[1]
+		const relativePoints: Point[] = [
+			[0, 0],
+			[p2[0] - x, p2[1] - y],
+		]
+		const [width, height] = dimensionsFromPoints(relativePoints)
+
+		const line: ExcalidrawLine = {
+			...createExLine(),
+			...getGroupAttrs(groups),
+			...presAttrsToElementValues(el),
+			points: relativePoints,
+			x,
+			y,
+			width,
+			height,
+			groupIds: groups.map((g) => g.id),
+		}
+
+		scene.elements.push(line)
+
 		walk(args, args.tw.nextNode())
 	},
 
