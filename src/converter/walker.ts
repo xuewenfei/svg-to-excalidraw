@@ -628,12 +628,44 @@ const walkers = {
 	},
 }
 
+// SVG elements whose children are templates/resources, not drawable content.
+// We must not descend into these — linkedom's TreeWalker ignores acceptNode,
+// so without explicit skipping their inner shapes leak into the scene.
+const NON_RENDERED_CONTAINERS = new Set([
+	'defs',
+	'mask',
+	'clippath',
+	'filter',
+	'pattern',
+	'symbol',
+	'marker',
+	'lineargradient',
+	'radialgradient',
+])
+
 export function walk(args: WalkerArgs, nextNode: Node | null): void {
 	if (!nextNode) {
 		return
 	}
 
 	const nodeName = nextNode.nodeName.toLowerCase() as keyof typeof walkers
+
+	if (NON_RENDERED_CONTAINERS.has(nodeName)) {
+		walk(args, getNextSibling(args.tw, nextNode))
+		return
+	}
+
+	// Subtrees referencing an unsupported mask or clip-path would render wrong
+	// without that mask applied. Drop them rather than emit phantom shapes.
+	if (
+		nextNode.nodeType === 1 &&
+		((nextNode as Element).hasAttribute('mask') ||
+			(nextNode as Element).hasAttribute('clip-path'))
+	) {
+		walk(args, getNextSibling(args.tw, nextNode))
+		return
+	}
+
 	if (walkers[nodeName]) {
 		walkers[nodeName](args)
 	} else {

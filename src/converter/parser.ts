@@ -76,12 +76,12 @@ export const convert = (svgString: string): ConversionResult => {
 			warnings.push(warning)
 		}
 
-		// Log success stats
-		if (elementCount > 0) {
-			console.log(
-				`✓ Successfully converted ${elementCount} SVG elements to Excalidraw format`,
-			)
-		}
+		// // Log success stats
+		// if (elementCount > 0) {
+		// 	console.log(
+		// 		`✓ Successfully converted ${elementCount} SVG elements to Excalidraw format`,
+		// 	)
+		// }
 	}
 
 	return {

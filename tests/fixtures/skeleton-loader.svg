@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120" width="360" height="120">
+  <defs>
+    <!-- card drop shadow -->
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="5"/>
+      <feOffset dx="0" dy="3"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.10"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- mask: only the bars are visible -->
+    <mask id="barMask">
+      <rect x="28" y="26" width="304" height="10" rx="5" fill="white"/>
+      <rect x="28" y="46" width="304" height="10" rx="5" fill="white"/>
+      <rect x="28" y="66" width="304" height="10" rx="5" fill="white"/>
+      <rect x="28" y="86" width="160" height="10" rx="5" fill="white"/>
+    </mask>
+
+    <!-- highlight gradient: transparent -> light -> transparent -->
+    <linearGradient id="shimmerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#f4f4f4" stop-opacity="0"/>
+      <stop offset="50%"  stop-color="#f4f4f4" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#f4f4f4" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- card -->
+  <rect x="6" y="6" width="348" height="108" rx="16"
+        fill="#ffffff" filter="url(#cardShadow)"/>
+
+  <!-- solid grey bars (the base, always visible) -->
+  <rect x="28" y="26" width="304" height="10" rx="5" fill="#dadada"/>
+  <rect x="28" y="46" width="304" height="10" rx="5" fill="#dadada"/>
+  <rect x="28" y="66" width="304" height="10" rx="5" fill="#dadada"/>
+  <rect x="28" y="86" width="160" height="10" rx="5" fill="#dadada"/>
+
+  <!-- shimmer overlay: a moving highlight clipped to the bar shapes -->
+  <g mask="url(#barMask)">
+    <rect x="-160" y="20" width="160" height="80" fill="url(#shimmerGrad)">
+      <animate attributeName="x"
+               values="-160; 360"
+               dur="1.8s"
+               repeatCount="indefinite"/>
+    </rect>
+  </g>
+</svg>
