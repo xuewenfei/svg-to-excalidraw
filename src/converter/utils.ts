@@ -2,7 +2,8 @@ import { nanoid } from 'nanoid'
 import { Random } from 'roughjs/bin/math.js'
 import type { Point } from './elements/ExcalidrawElement.ts'
 
-const random = new Random(Date.now())
+const seedSource = process.env.SVG_TO_EXCALIDRAW_SEED
+const random = new Random(seedSource ? Number(seedSource) : Date.now())
 
 export const randomInteger = (): number => Math.floor(random.next() * 2 ** 31)
 

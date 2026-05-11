@@ -18,4 +18,9 @@ package-lock.json
 static
 yarn-debug.log*
 yarn-error.log*
+tests/visual/.bundle
+tests/visual/.actual
+tests/visual/.diffs
+test-results
+playwright-report
 
