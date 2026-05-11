@@ -57,6 +57,7 @@
 		"path-data-parser": "^0.1.0",
 		"points-on-curve": "^0.2.0",
 		"points-on-path": "^0.2.1",
-		"roughjs": "^4.4.1"
+		"roughjs": "^4.4.1",
+		"svgo": "^4.0.1"
 	}
 }

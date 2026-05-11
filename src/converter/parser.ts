@@ -1,6 +1,7 @@
 import { DOMParser } from './dom.ts'
 import ExcalidrawScene from './elements/ExcalidrawScene.ts'
 import type Group from './elements/Group.ts'
+import { preprocessSvg } from './preprocess.ts'
 import { createTreeWalker, walk } from './walker.ts'
 
 export type ConversionResult = {
@@ -25,7 +26,8 @@ export const convert = (svgString: string): ConversionResult => {
 		}
 	}
 
-	const svgDOM = DOMParser.parseFromString(svgString, 'image/svg+xml')
+	const preprocessed = preprocessSvg(svgString)
+	const svgDOM = DOMParser.parseFromString(preprocessed, 'image/svg+xml')
 
 	// was there a parsing error?
 	const errorsElements = svgDOM.querySelectorAll('parsererror')

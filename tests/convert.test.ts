@@ -174,6 +174,19 @@ describe('SVG to Excalidraw conversion', () => {
 		expect(result.content!.elements[0].x).toBe(10)
 	})
 
+	test('drops elements hidden with display:none via preprocessor', () => {
+		const result = convert(`
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <rect x="10" y="10" width="20" height="20" fill="blue"/>
+        <rect x="40" y="40" width="20" height="20" fill="red" display="none"/>
+      </svg>
+    `)
+
+		expect(result.hasErrors).toBe(false)
+		expect(result.content?.elements.length).toBe(1)
+		expect(result.content!.elements[0].x).toBe(10)
+	})
+
 	test('converts the skeleton-loader fixture without phantom shimmer rect', async () => {
 		// Real-world SVG that previously produced an off-canvas rect at x=-160
 		// (the shimmer overlay) plus duplicate mask rects. The output should be
