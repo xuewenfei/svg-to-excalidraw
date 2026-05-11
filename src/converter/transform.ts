@@ -2,159 +2,128 @@ import { mat4, vec3 } from 'gl-matrix'
 import type Group from './elements/Group.ts'
 
 /*
-SVG transform attr is a bit strange in that it can accept traditional
-css transform string (at least per spec) as well as a it's own "unitless"
-version of transform functions.
+SVG transform attribute parsing.
+
+The SVG transform attribute supports a fixed set of functions:
+  matrix(a, b, c, d, e, f)
+  translate(tx [, ty])
+  scale(sx [, sy])
+  rotate(angle [, cx, cy])
+  skewX(angle)
+  skewY(angle)
+
+Numbers may be separated by commas and/or whitespace. We parse directly
+into a mat4 (gl-matrix) so this code runs in any JS environment without
+relying on the browser-only DOMMatrix global.
 
 https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/transform
 */
 
-const transformFunctions = {
-	matrix: 'matrix',
-	matrix3d: 'matrix3d',
-	perspective: 'perspective',
-	rotate: 'rotate',
-	rotate3d: 'rotate3d',
-	rotateX: 'rotateX',
-	rotateY: 'rotateY',
-	rotateZ: 'rotateZ',
-	scale: 'scale',
-	scale3d: 'scale3d',
-	scaleX: 'scaleX',
-	scaleY: 'scaleY',
-	scaleZ: 'scaleZ',
-	skew: 'skew',
-	skewX: 'skewX',
-	skewY: 'skewY',
-	translate: 'translate',
-	translate3d: 'translate3d',
-	translateX: 'translateX',
-	translateY: 'translateY',
-	translateZ: 'translateZ',
-} as const
+const DEG_TO_RAD = Math.PI / 180
 
-const transformFunctionsArr = Object.keys(transformFunctions)
+type TransformFn =
+	| 'matrix'
+	| 'translate'
+	| 'scale'
+	| 'rotate'
+	| 'skewX'
+	| 'skewY'
 
-// type Transform
+const isTransformFn = (name: string): name is TransformFn =>
+	name === 'matrix' ||
+	name === 'translate' ||
+	name === 'scale' ||
+	name === 'rotate' ||
+	name === 'skewX' ||
+	name === 'skewY'
 
-type TransformFuncValue = {
-	value: string
-	unit: string
+const parseArgs = (raw: string): number[] => {
+	const trimmed = raw.trim()
+	if (!trimmed) return []
+	return trimmed
+		.split(/[\s,]+/)
+		.filter((s) => s.length > 0)
+		.map(Number)
 }
 
-type TransformFunc = {
-	type: keyof typeof transformFunctions
-	values: TransformFuncValue[]
+const mat4FromAffine2D = (
+	a: number,
+	b: number,
+	c: number,
+	d: number,
+	e: number,
+	f: number,
+): mat4 => mat4.fromValues(a, b, 0, 0, c, d, 0, 0, 0, 0, 1, 0, e, f, 0, 1)
+
+const transformFnToMat = (name: TransformFn, args: number[]): mat4 => {
+	switch (name) {
+		case 'matrix': {
+			const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = args
+			return mat4FromAffine2D(a, b, c, d, e, f)
+		}
+		case 'translate': {
+			const [tx = 0, ty = 0] = args
+			return mat4FromAffine2D(1, 0, 0, 1, tx, ty)
+		}
+		case 'scale': {
+			const [sx = 1, sy = sx] = args
+			return mat4FromAffine2D(sx, 0, 0, sy, 0, 0)
+		}
+		case 'rotate': {
+			const [angle = 0, cx = 0, cy = 0] = args
+			const rad = angle * DEG_TO_RAD
+			const cos = Math.cos(rad)
+			const sin = Math.sin(rad)
+			if (cx === 0 && cy === 0) {
+				return mat4FromAffine2D(cos, sin, -sin, cos, 0, 0)
+			}
+			// rotate(a, cx, cy) = translate(cx, cy) * rotate(a) * translate(-cx, -cy)
+			const tx = cx - cx * cos + cy * sin
+			const ty = cy - cx * sin - cy * cos
+			return mat4FromAffine2D(cos, sin, -sin, cos, tx, ty)
+		}
+		case 'skewX': {
+			const [angle = 0] = args
+			return mat4FromAffine2D(1, 0, Math.tan(angle * DEG_TO_RAD), 1, 0, 0)
+		}
+		case 'skewY': {
+			const [angle = 0] = args
+			return mat4FromAffine2D(1, Math.tan(angle * DEG_TO_RAD), 0, 1, 0, 0)
+		}
+	}
 }
 
-const defaultUnits = {
-	matrix: '',
-	matrix3d: '',
-	perspective: 'perspective',
-	rotate: 'deg',
-	rotate3d: 'deg',
-	rotateX: 'deg',
-	rotateY: 'deg',
-	rotateZ: 'deg',
-	scale: '',
-	scale3d: '',
-	scaleX: '',
-	scaleY: '',
-	scaleZ: '',
-	skew: 'skew',
-	skewX: 'deg',
-	skewY: 'deg',
-	translate: 'px',
-	translate3d: 'px',
-	translateX: 'px',
-	translateY: 'px',
-	translateZ: 'px',
-}
+export const parseSVGTransform = (transformStr: string): mat4 => {
+	const result = mat4.create()
+	const fnMatches = transformStr.match(/(\w+)\s*\(([^)]*)\)/g)
+	if (!fnMatches) return result
 
-// Convert between possible svg transform attribute values to css transform attribute values.
-const svgTransformToCSSTransform = (svgTransformStr: string): string => {
-	// Create transform function string "chunks", e.g "rotate(90deg)"
-	const tFuncs = svgTransformStr.match(/(\w+)\(([^)]*)\)/g)
-	if (!tFuncs) {
-		return ''
+	for (const chunk of fnMatches) {
+		const open = chunk.indexOf('(')
+		const name = chunk.slice(0, open).trim()
+		if (!isTransformFn(name)) {
+			throw new Error(`Unsupported SVG transform function: "${name}"`)
+		}
+		const argStr = chunk.slice(open + 1, chunk.lastIndexOf(')'))
+		const args = parseArgs(argStr)
+		mat4.multiply(result, result, transformFnToMat(name, args))
 	}
 
-	const tFuncValues: TransformFunc[] = tFuncs.map((tFuncStr): TransformFunc => {
-		const type = tFuncStr.split('(')[0] as keyof typeof transformFunctions
-		if (!type) {
-			throw new Error('Unable to find transform name')
-		}
-		if (!transformFunctionsArr.includes(type)) {
-			throw new Error(`transform function name "${type}" is not valid`)
-		}
-
-		// get the arg/props of the transform function, e.g "90deg".
-		const tFuncParts = tFuncStr.match(/([-+]?[0-9]*\.?[0-9]+)([a-z])*/g)
-		if (!tFuncParts) {
-			return { type, values: [] }
-		}
-
-		let values = tFuncParts.map((a): TransformFuncValue => {
-			// Separate the arg value and unit. e.g ["90", "deg"]
-			const [value, unit] = a.matchAll(/([-+]?[0-9]*\.?[0-9]+)|([a-z])*/g)
-
-			return {
-				unit: unit[0] || defaultUnits[type],
-				value: value[0],
-			}
-		})
-
-		// Not supporting x, y args of svg rotate transform yet...
-		if (values && type === 'rotate' && values?.length > 1) {
-			values = [values[0]]
-		}
-
-		return {
-			type,
-			values,
-		}
-	})
-
-	// Generate a string of transform functions that can be set as a CSS Transform.
-	const csstransformStr = tFuncValues
-		.map(({ type, values }) => {
-			const valStr = values
-				.map(({ unit, value }) => `${value}${unit}`)
-				.join(', ')
-			return `${type}(${valStr})`
-		})
-		.join(' ')
-
-	return csstransformStr
-}
-
-export const createDOMMatrixFromSVGStr = (
-	svgTransformStr: string,
-): DOMMatrix => {
-	const cssTransformStr = svgTransformToCSSTransform(svgTransformStr)
-
-	return new DOMMatrix(cssTransformStr)
+	return result
 }
 
 export function getElementMatrix(el: Element): mat4 {
 	if (el.hasAttribute('transform')) {
-		const elMat = new DOMMatrix(
-			svgTransformToCSSTransform(el.getAttribute('transform') || ''),
-		)
-
-		return mat4.multiply(mat4.create(), mat4.create(), elMat.toFloat32Array())
+		return parseSVGTransform(el.getAttribute('transform') || '')
 	}
-
 	return mat4.create()
 }
 
 export function getTransformMatrix(el: Element, groups: Group[]): mat4 {
-	const accumMat = groups
+	return groups
 		.map(({ element }) => getElementMatrix(element))
 		.concat([getElementMatrix(el)])
 		.reduce((acc, mat) => mat4.multiply(acc, acc, mat), mat4.create())
-
-	return accumMat
 }
 
 export function transformPoints(
@@ -167,7 +136,6 @@ export function transformPoints(
 			vec3.fromValues(x, y, 1),
 			transform,
 		)
-
 		return [newX, newY]
 	})
 }
