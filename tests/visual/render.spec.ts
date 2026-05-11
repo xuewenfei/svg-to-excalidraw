@@ -1,26 +1,16 @@
-import { existsSync, mkdirSync } from 'node:fs'
-import { copyFile, readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
-import { compare } from 'odiff-bin'
+import { toHaveScreenshotOdiff } from 'playwright-odiff'
+
+expect.extend({ toHaveScreenshotOdiff })
 
 process.env.SVG_TO_EXCALIDRAW_SEED = '1'
 const { convert } = await import('../../src/converter')
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const FIXTURES = path.join(HERE, '..', 'fixtures', 'w3c')
-const BASELINES = path.join(HERE, 'baselines')
-const ACTUAL = path.join(HERE, '.actual')
-const DIFFS = path.join(HERE, '.diffs')
-
-for (const dir of [BASELINES, ACTUAL, DIFFS]) {
-	if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-}
-
-const UPDATE = process.env.UPDATE_SNAPSHOTS === '1'
-const THRESHOLD = 0.05 // antialiasing tolerance per pixel
-const FAIL_RATIO = 0.02 // allow up to 2% of pixels to differ
 
 const TASKS = [
 	{ file: 'shapes-rect-01-t.svg', label: 'rect basics' },
@@ -97,34 +87,11 @@ for (const task of TASKS) {
 		)
 		expect(ok, 'excalidraw rendered something').toBe(true)
 
-		const png = await page.locator('#render').screenshot()
-
 		const slug = task.file.replace(/\.svg$/, '')
-		const actualPath = path.join(ACTUAL, `${slug}.png`)
-		const baselinePath = path.join(BASELINES, `${slug}.png`)
-		const diffPath = path.join(DIFFS, `${slug}.png`)
-		await writeFile(actualPath, png)
-
-		if (!existsSync(baselinePath) || UPDATE) {
-			await copyFile(actualPath, baselinePath)
-			console.log(`baselined ${slug}`)
-			return
-		}
-
-		const cmp = await compare(baselinePath, actualPath, diffPath, {
-			threshold: THRESHOLD,
-			failOnLayoutDiff: false,
-			outputDiffMask: false,
+		await expect(page.locator('#render')).toHaveScreenshotOdiff(`${slug}.png`, {
+			maxDiffPixelRatio: 0.02,
+			antialiasing: true,
 		})
-
-		if (cmp.match === false) {
-			const diffRatio =
-				'diffPercentage' in cmp ? (cmp.diffPercentage as number) / 100 : 1
-			expect(
-				diffRatio,
-				`pixel diff exceeded ${(FAIL_RATIO * 100).toFixed(1)}%; see ${diffPath}`,
-			).toBeLessThanOrEqual(FAIL_RATIO)
-		}
 
 		expect(consoleErrors, 'no console errors').toEqual([])
 	})

@@ -1,8 +1,8 @@
-import { defineConfig } from '@playwright/test'
+import { defineConfig, type PlaywrightTestConfig } from '@playwright/test'
 
-export default defineConfig({
+const config: PlaywrightTestConfig = defineConfig({
 	testDir: './tests/visual',
-	testMatch: /.*\.playwright\.ts$/,
+	testMatch: /.*\.spec\.ts$/,
 	fullyParallel: false,
 	reporter: 'list',
 	use: {
@@ -16,3 +16,5 @@ export default defineConfig({
 		},
 	],
 })
+
+export default config

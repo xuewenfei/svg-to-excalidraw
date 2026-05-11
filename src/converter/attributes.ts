@@ -18,6 +18,48 @@ export function getNum(el: Element, attr: string, backup?: number): number {
 	return Number.isNaN(numVal) ? backup || 0 : numVal
 }
 
+// Resolve a `fill="url(#id)"` reference to a flat color. Excalidraw can't render
+// SVG gradients, so we pick the perceptual average of the gradient's <stop> colors
+// (weighted by stop-opacity) as a reasonable still-recognizable substitute.
+function resolveGradientFallback(el: Element, gradId: string): string | null {
+	const doc = el.ownerDocument
+	if (!doc) return null
+
+	// Walk the xlink:href chain — a gradient may inherit stops from another
+	// gradient. Cap the depth to avoid cycles in malformed docs.
+	let grad: Element | null = doc.getElementById(gradId)
+	const seen = new Set<string>()
+	let stops: Element[] = []
+	for (let i = 0; grad && i < 8; i++) {
+		const tag = grad.tagName.toLowerCase()
+		if (tag !== 'lineargradient' && tag !== 'radialgradient') return null
+		stops = Array.from(grad.getElementsByTagName('stop'))
+		if (stops.length > 0) break
+
+		const href =
+			grad.getAttribute('href') ?? grad.getAttribute('xlink:href') ?? ''
+		const nextId = /^#(.+)$/.exec(href)?.[1]
+		if (!nextId || seen.has(nextId)) return null
+		seen.add(nextId)
+		grad = doc.getElementById(nextId)
+	}
+
+	if (stops.length === 0) return null
+
+	const colors = stops
+		.map((s) => s.getAttribute('stop-color') ?? '#000000')
+		.filter((c) => c.length > 0)
+	const [first, ...rest] = colors
+	if (!first) return null
+	if (rest.length === 0) return chroma(first).hex()
+
+	try {
+		return chroma.average(colors, 'lab').hex()
+	} catch {
+		return first
+	}
+}
+
 const presAttrs = {
 	stroke: 'stroke',
 	'stroke-opacity': 'stroke-opacity',
@@ -61,14 +103,18 @@ const attrHandlers: PresAttrHandlers = {
 	fill: ({ el, exVals }) => {
 		const fill = get(el, `fill`)
 
-		// TODO(fidelity:gradient-fallback): when `fill` is `url(#someGradient)`, Excalidraw
-		// can't render the gradient and the shape comes out unfilled (see pservers-grad-01-b
-		// in tests/visual/fidelity.playwright.ts — currently ~38% pixel diff). Resolve the
-		// referenced <linearGradient>/<radialGradient> in the source doc, pick a fallback
-		// color (first <stop> color, or the middle stop, or a perceptual average of stops),
-		// and set backgroundColor to that. Would drop the gradient fixture from ~38% → ~10%.
-		// See tests/visual/FIDELITY-TODO.md.
-		exVals.backgroundColor = fill === 'none' ? '#00000000' : fill
+		if (fill === 'none') {
+			exVals.backgroundColor = '#00000000'
+			return
+		}
+
+		const gradId = /^url\(#([^)]+)\)$/.exec(fill)?.[1]
+		if (gradId) {
+			exVals.backgroundColor = resolveGradientFallback(el, gradId) ?? fill
+			return
+		}
+
+		exVals.backgroundColor = fill
 	},
 
 	'fill-opacity': ({ el, exVals }) => {

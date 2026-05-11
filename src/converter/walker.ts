@@ -1,4 +1,4 @@
-import { mat4 } from 'gl-matrix'
+import { mat4, vec3 } from 'gl-matrix'
 import { pointsOnPath } from 'points-on-path'
 import {
 	filterAttrsToElementValues,
@@ -494,43 +494,43 @@ const walkers = {
 		const topLeftY = svgY - baseline
 
 		const mat = getTransformMatrix(el, groups)
-		const m = mat4.fromValues(
-			1,
-			0,
-			0,
-			0,
-			0,
-			1,
-			0,
-			0,
-			0,
-			0,
-			1,
-			0,
-			topLeftX,
-			topLeftY,
-			0,
-			1,
+
+		// Decompose the 2D affine portion of `mat` into rotation + uniform scale so
+		// rotated/scaled parent groups affect the rendered text. Excalidraw text has
+		// no skew, so any shear or non-uniform-scale component is dropped (documented
+		// limitation — see tests/visual/FIDELITY-TODO.md).
+		const a = mat[0]
+		const b = mat[1]
+		const c = mat[4]
+		const d = mat[5]
+		const scaleX = Math.hypot(a, b)
+		const scaleY = Math.hypot(c, d)
+		const rotation = scaleX === 0 ? 0 : Math.atan2(b, a)
+		const uniformScale = Math.sqrt(Math.max(scaleX * scaleY, 0)) || 1
+		const scaledFontSize = fontSize * uniformScale
+		const scaledWidth = width * uniformScale
+		const scaledHeight = lineHeight * uniformScale
+
+		// Excalidraw rotates a text element about its own center, so place the box
+		// so its center lands where the SVG transform maps the local center to.
+		const localCenterX = topLeftX + width / 2
+		const localCenterY = topLeftY + lineHeight / 2
+		const worldCenter = vec3.transformMat4(
+			vec3.create(),
+			vec3.fromValues(localCenterX, localCenterY, 1),
+			mat,
 		)
-		const result = mat4.multiply(mat4.create(), mat, m)
-		// TODO(fidelity:transformed-text): only the translation component of `mat` lands
-		// on the text element (result[12], result[13]); rotation/scale/skew from a parent
-		// <g transform> never reach the rendered text, so labels inside rotated/scaled
-		// groups appear at the right x/y but unrotated and unscaled. See coords-trans-01-b
-		// in tests/visual/fidelity.playwright.ts (currently ~18% diff — much of it is the
-		// mispositioned/unrotated transform labels). Extract rotation from `mat` and set
-		// `angle` on the text element; consider applying scale to fontSize.
-		// See tests/visual/FIDELITY-TODO.md.
 
 		const textEl: ExcalidrawText = {
 			...createExText(),
 			...presAttrs(el, groups),
-			x: result[12],
-			y: result[13],
-			width,
-			height: lineHeight,
+			x: worldCenter[0] - scaledWidth / 2,
+			y: worldCenter[1] - scaledHeight / 2,
+			width: scaledWidth,
+			height: scaledHeight,
+			angle: rotation,
 			text: rawText,
-			fontSize,
+			fontSize: scaledFontSize,
 			fontFamily,
 			textAlign,
 			baseline,

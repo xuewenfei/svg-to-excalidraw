@@ -1,6 +1,6 @@
 # Fidelity TODOs
 
-Surface-area issues uncovered by `tests/visual/fidelity.playwright.ts`, which
+Surface-area issues uncovered by `tests/visual/fidelity.spec.ts`, which
 rasterizes each W3C SVG fixture and diffs it against the same fixture converted
 to Excalidraw and rendered via `@excalidraw/excalidraw`'s `exportToSvg`. Both
 rasters share the source viewBox, aspect ratio, and inner canvas region — so
@@ -8,7 +8,7 @@ pixel diffs reflect real conversion quality, not layout drift.
 
 When the converter is changed, re-run `bun run test:visual` and watch how the
 diff percentages move. The current state-of-the-world is the baseline below;
-tighten budgets in `fidelity.playwright.ts` as fixes land.
+tighten budgets in `fidelity.spec.ts` as fixes land.
 
 ## Current diff baseline (2026-05-11)
 
@@ -22,49 +22,40 @@ tighten budgets in `fidelity.playwright.ts` as fixes land.
 | `shapes-polyline-01-t` | 11.59% | 18% | same as polygon |
 | `paths-data-01-t` | 9.38% | 15% | clean |
 | `struct-group-01-t` | 2.15% | 8% | clean |
-| `coords-trans-01-b` | 18.10% | 25% | **transformed-text mispositioning** |
+| `coords-trans-01-b` | 18.10% | 25% | residual diff is L-shape/grid placement; text labels in this fixture don't sit inside rotated groups, so the text-transform fix didn't move the number |
 | `painting-stroke-01-t` | 6.51% | 12% | clean |
 | `text-intro-01-t` | 8.54% | 15% | clean |
-| `paths-data-08-t` | 9.80% | 15% | clean |
-| `pservers-grad-01-b` | 38.38% | 50% | **gradients render as no-fill** |
+| `paths-data-08-t` | 9.68% | 15% | clean |
+| `pservers-grad-01-b` | 38.38% | 50% | both rects now filled with averaged stop color; per-pixel metric doesn't reward flat-vs-gradient swap (still differs at threshold 0.1 everywhere inside the bar) |
 
-## TODOs
+## Completed
 
-### 1. `TODO(fidelity:gradient-fallback)` — pick a solid color when fill is a gradient ref
+- **gradient fallback** (`src/converter/attributes.ts` fill handler): `url(#id)`
+  fills resolve to the perceptual Lab average of the referenced
+  `<linearGradient>` / `<radialGradient>` stops. Follows `href` / `xlink:href`
+  chains (capped depth) so gradients that inherit stops from another gradient
+  still resolve. Numeric diff for `pservers-grad-01-b` is unchanged because both
+  flat gray and gradient pixels exceed `threshold: 0.1` against each other, but
+  the raster now shows both bars filled with a representative color instead of
+  empty outlines.
+- **transformed text** (`src/converter/walker.ts` text walker): decomposes the
+  parent transform matrix into rotation + uniform scale, sets `angle` and a
+  scaled `fontSize` on the `ExcalidrawText`, and places `x/y` so the rotated
+  box's center lands at the SVG anchor's transformed center (Excalidraw rotates
+  about element center, not top-left). Skew and shear are intentionally dropped
+  (Excalidraw text has no skew). Plain non-transformed text positioning is
+  unchanged because under identity rotation/scale the center-based placement
+  reduces to the previous top-left placement.
 
-**Site:** `src/converter/attributes.ts` (inside `fill` handler — see TODO comment).
-**Symptom:** `pservers-grad-01-b` rasters as outlined rectangles with no fill,
-because `<rect fill="url(#myGradient)">` ends up with `backgroundColor: "url(#myGradient)"`
-which Excalidraw doesn't render.
-**Fix sketch:** when `fill` matches `/^url\(#(.+)\)$/`, look up that id in the
-source document. If it resolves to a `<linearGradient>`/`<radialGradient>`,
-take the first `<stop stop-color>` (or perceptual average of all stops) and set
-`backgroundColor` to that hex.
-**Expected impact:** drops `pservers-grad-01-b` from ~38% → ~10%.
-**Tighten:** after landing, lower the fixture's `fidelityFailRatio` to ~0.12.
+## Open
 
-### 2. `TODO(fidelity:transformed-text)` — apply rotation/scale from parent transforms to text
-
-**Site:** `src/converter/walker.ts` inside the `text:` walker (see TODO comment).
-**Symptom:** `coords-trans-01-b` shows transform-label text (`translate(...)`,
-`rotate(...)`, `skewX(15)`, `skewY(15)`, `scale(2)`) at the right anchor point
-but always horizontal and at the source font size — even when the parent `<g>`
-has a non-identity rotation/scale. Only `result[12]` and `result[13]`
-(translation) survive the matrix multiply; the rest is dropped.
-**Fix sketch:** decompose `mat` into rotation + scale + translation. Set
-`angle: rotationRadians` on the `ExcalidrawText`; multiply `fontSize` by the
-uniform scale (or geometric mean of x/y scale). Skew can't be represented in
-Excalidraw text and is best documented as a known limitation.
-**Expected impact:** drops `coords-trans-01-b` from ~18% → ~8–10%.
-**Tighten:** lower budget to ~0.15 after landing.
-
-### 3. (investigate) polygon / polyline diff higher than other simple shapes
+### (investigate) polygon / polyline diff higher than other simple shapes
 
 **Symptom:** `shapes-polygon-01-t` and `shapes-polyline-01-t` both diff ~12%
 while comparable simple shapes (rect, circle, ellipse, line) all sit under 5%.
 **Hypothesis:** Excalidraw renders polygon/polyline with different stroke join
 or end-cap behavior than SVG default (`miter` vs `round`?). Worth opening one
-of the diff overlays in `tests/visual/.diffs-fidelity/` and seeing whether the
+of the diff overlays in `tests/visual/.working/diffs/` and seeing whether the
 diff concentrates on joins/ends or on the body of the strokes.
 **No TODO comment in code yet** — file one once a root cause is identified.
 

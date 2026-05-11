@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdirSync, rmSync } from 'node:fs'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
@@ -10,13 +11,22 @@ const { convert } = await import('../../src/converter')
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const FIXTURES = path.join(HERE, '..', 'fixtures', 'w3c')
-const SOURCE = path.join(HERE, '.source-fidelity')
-const ACTUAL = path.join(HERE, '.actual-fidelity')
-const DIFFS = path.join(HERE, '.diffs-fidelity')
+// The fixture SVG is the single source of truth. SVG rasters and Excalidraw
+// rasters are rendered on the fly into a per-test tmp dir (odiff needs file
+// paths) and deleted after diffing. Only the diff overlay persists, under
+// .working/diffs/, so you can open it when a check fails.
+// Set KEEP_RASTERS=1 to also persist the SVG + Excalidraw rasters under
+// .working/svg-rasters/ and .working/excalidraw-rasters/ for deeper debugging.
+// The .working/ tree is wiped at the start of each run so no stale files survive.
+const WORKING = path.join(HERE, '.working')
+const DIFFS = path.join(WORKING, 'diffs')
+const KEEP_RASTERS = !!process.env.KEEP_RASTERS
+const SVG_RASTERS = path.join(WORKING, 'svg-rasters')
+const EXCAL_RASTERS = path.join(WORKING, 'excalidraw-rasters')
 
-for (const dir of [SOURCE, ACTUAL, DIFFS]) {
-	if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-}
+rmSync(WORKING, { recursive: true, force: true })
+const dirs = KEEP_RASTERS ? [DIFFS, SVG_RASTERS, EXCAL_RASTERS] : [DIFFS]
+for (const dir of dirs) mkdirSync(dir, { recursive: true })
 
 const THRESHOLD = 0.1 // generous per-pixel tolerance — sketchy strokes ok
 // Canvas is sized so the inner box (after padding) is exactly 4:3, matching the
@@ -163,14 +173,24 @@ for (const task of TASKS) {
 		const slug = task.file.replace(/\.svg$/, '')
 		const viewBox = extractViewBox(svg)
 
-		// 1. Rasterize source SVG via Playwright.
+		// 1. Rasterize source SVG via Playwright. Written to an ephemeral tmp
+		// dir — the fixture .svg is the source of truth; we re-render on the fly
+		// and only persist long enough for odiff (which takes file paths).
 		await page.setContent(SOURCE_HTML(svg), { waitUntil: 'load' })
 		await page.waitForFunction(() => {
 			const img = document.getElementById('src') as HTMLImageElement | null
 			return !!img && img.complete && img.naturalWidth > 0
 		})
 		const sourcePng = await page.locator('#render').screenshot()
-		const sourcePath = path.join(SOURCE, `${slug}.png`)
+		const tmpDir = KEEP_RASTERS
+			? null
+			: await mkdtemp(path.join(os.tmpdir(), 'svg-fidelity-'))
+		const sourcePath = KEEP_RASTERS
+			? path.join(SVG_RASTERS, `${slug}.png`)
+			: path.join(tmpDir as string, `${slug}-svg.png`)
+		const actualPath = KEEP_RASTERS
+			? path.join(EXCAL_RASTERS, `${slug}.png`)
+			: path.join(tmpDir as string, `${slug}-excalidraw.png`)
 		await writeFile(sourcePath, sourcePng)
 
 		// 2. Run converter and render via Excalidraw.
@@ -199,16 +219,17 @@ for (const task of TASKS) {
 		)
 		expect(ok, 'excalidraw rendered something').toBe(true)
 		const excalPng = await page.locator('#render').screenshot()
-		const actualPath = path.join(ACTUAL, `${slug}.png`)
 		await writeFile(actualPath, excalPng)
 
-		// 3. Diff.
+		// 3. Diff. The diff overlay is the only artifact worth keeping — it's
+		// what you open to see *where* the converter drifted from the SVG.
 		const diffPath = path.join(DIFFS, `${slug}.png`)
 		const cmp = await compare(sourcePath, actualPath, diffPath, {
 			threshold: THRESHOLD,
 			failOnLayoutDiff: false,
 			outputDiffMask: false,
 		})
+		if (tmpDir) await rm(tmpDir, { recursive: true, force: true })
 
 		const diffRatio =
 			cmp.match === false && 'diffPercentage' in cmp
