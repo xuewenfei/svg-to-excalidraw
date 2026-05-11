@@ -21,6 +21,9 @@ yarn-error.log*
 tests/visual/.bundle
 tests/visual/.actual
 tests/visual/.diffs
+tests/visual/.actual-fidelity
+tests/visual/.diffs-fidelity
+tests/visual/.source-fidelity
 test-results
 playwright-report
 

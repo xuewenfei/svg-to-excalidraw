@@ -513,6 +513,14 @@ const walkers = {
 			1,
 		)
 		const result = mat4.multiply(mat4.create(), mat, m)
+		// TODO(fidelity:transformed-text): only the translation component of `mat` lands
+		// on the text element (result[12], result[13]); rotation/scale/skew from a parent
+		// <g transform> never reach the rendered text, so labels inside rotated/scaled
+		// groups appear at the right x/y but unrotated and unscaled. See coords-trans-01-b
+		// in tests/visual/fidelity.playwright.ts (currently ~18% diff — much of it is the
+		// mispositioned/unrotated transform labels). Extract rotation from `mat` and set
+		// `angle` on the text element; consider applying scale to fontSize.
+		// See tests/visual/FIDELITY-TODO.md.
 
 		const textEl: ExcalidrawText = {
 			...createExText(),

@@ -61,6 +61,13 @@ const attrHandlers: PresAttrHandlers = {
 	fill: ({ el, exVals }) => {
 		const fill = get(el, `fill`)
 
+		// TODO(fidelity:gradient-fallback): when `fill` is `url(#someGradient)`, Excalidraw
+		// can't render the gradient and the shape comes out unfilled (see pservers-grad-01-b
+		// in tests/visual/fidelity.playwright.ts — currently ~38% pixel diff). Resolve the
+		// referenced <linearGradient>/<radialGradient> in the source doc, pick a fallback
+		// color (first <stop> color, or the middle stop, or a perceptual average of stops),
+		// and set backgroundColor to that. Would drop the gradient fixture from ~38% → ~10%.
+		// See tests/visual/FIDELITY-TODO.md.
 		exVals.backgroundColor = fill === 'none' ? '#00000000' : fill
 	},
 
