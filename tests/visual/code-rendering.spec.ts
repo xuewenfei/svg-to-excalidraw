@@ -11,6 +11,11 @@ const GENERATOR = path.join(HERE, '../../src/code-rendering/generate-scene.ts')
 
 type Scene = { elements: unknown[] }
 
+// codeToExcalidraw imports @excalidraw/excalidraw, which is a browser-only library.
+// Its dist imports open-color as a bare JSON module and roughjs without .js extensions —
+// both of which break under Node.js ESM (Playwright's runtime). Bun handles both fine,
+// so we run generation in a Bun subprocess rather than importing directly here.
+// DO NOT replace this with a direct import of codeToExcalidraw.
 function generateScene(code: string, lang: string): Scene {
 	const result = spawnSync('bun', [GENERATOR, code, lang], {
 		encoding: 'utf8',
