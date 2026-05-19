@@ -2,16 +2,20 @@ import { convertToExcalidrawElements } from '@excalidraw/excalidraw'
 import { nanoid } from 'nanoid'
 import { type BundledLanguage, createHighlighter } from 'shiki'
 
-type ExcalidrawElementSkeleton = Parameters<
-	typeof convertToExcalidrawElements
->[0][number]
-type ExcalidrawScene = {
-	type: string
-	version: number
-	source: string
-	elements: ReturnType<typeof convertToExcalidrawElements>
-	appState: { gridSize: number; viewBackgroundColor: string }
-	files: Record<string, never>
+type ExcalidrawElementSkeleton = Parameters<typeof convertToExcalidrawElements>[0][number]
+
+/** Raw Excalidraw elements array, ready to embed into any scene. */
+export type CodeBlockElements = ReturnType<typeof convertToExcalidrawElements>
+
+
+/**
+ * The result of `codeToExcalidraw`.
+ *
+ * - `elements` — raw element array for embedding into an existing scene
+ * - `scene` — complete `.excalidraw` file document, ready to save or display
+ */
+export type CodeBlockResult = {
+	elements: CodeBlockElements
 }
 
 const FONT_SIZE = 14
@@ -20,6 +24,7 @@ const LINE_HEIGHT = FONT_SIZE * 1.5
 const PADDING = 16
 
 function rectSkeleton(
+	id: string,
 	x: number,
 	y: number,
 	width: number,
@@ -29,6 +34,7 @@ function rectSkeleton(
 ): ExcalidrawElementSkeleton {
 	return {
 		type: 'rectangle',
+		id,
 		x,
 		y,
 		width,
@@ -46,6 +52,7 @@ function rectSkeleton(
 }
 
 function textSkeleton(
+	id: string,
 	text: string,
 	x: number,
 	y: number,
@@ -54,6 +61,7 @@ function textSkeleton(
 ): ExcalidrawElementSkeleton {
 	return {
 		type: 'text',
+		id,
 		text,
 		x,
 		y,
@@ -68,11 +76,33 @@ function textSkeleton(
 	}
 }
 
+/**
+ * Renders a syntax-highlighted code block as Excalidraw elements.
+ *
+ * Each call generates fresh element IDs, so multiple results can be composed
+ * into the same scene without conflicts.
+ *
+ * Returns both the raw `elements` array (for embedding into an existing scene)
+ * and a standalone `scene` document (`.excalidraw` file format).
+ *
+ * @param code   - Source code string to render.
+ * @param lang   - Shiki language identifier. Defaults to `'typescript'`.
+ * @param origin - Top-left position of the block in scene coordinates.
+ *
+ * @example
+ * ```ts
+ * const { elements, scene } = await codeToExcalidraw(code, 'typescript')
+ * // embed into a larger scene:
+ * myScene.elements.push(...elements)
+ * // or write a standalone file:
+ * await Bun.write('code.excalidraw', JSON.stringify(scene))
+ * ```
+ */
 export async function codeToExcalidraw(
 	code: string,
 	lang: BundledLanguage = 'typescript',
 	origin = { x: 100, y: 100 },
-): Promise<ExcalidrawScene> {
+): Promise<CodeBlockResult> {
 	const highlighter = await createHighlighter({
 		themes: ['dark-plus'],
 		langs: [lang],
@@ -95,16 +125,14 @@ export async function codeToExcalidraw(
 				return
 			}
 			skeletons.push(
-				textSkeleton(token.content, x, y, token.color ?? '#d4d4d4', groupId),
+				textSkeleton(nanoid(), token.content, x, y, token.color ?? '#d4d4d4', groupId),
 			)
 			x += token.content.length * CHAR_WIDTH
 		})
 	})
 
 	const maxX = Math.max(...skeletons.map((el) => (el.x ?? 0) + (el.width ?? 0)))
-	const maxY = Math.max(
-		...skeletons.map((el) => (el.y ?? 0) + (el.height ?? 0)),
-	)
+	const maxY = Math.max(...skeletons.map((el) => (el.y ?? 0) + (el.height ?? 0)))
 
 	const meta = {
 		type: 'code-block',
@@ -119,6 +147,7 @@ export async function codeToExcalidraw(
 	}
 
 	const rect = rectSkeleton(
+		nanoid(),
 		origin.x,
 		origin.y,
 		maxX - origin.x + PADDING,
@@ -129,12 +158,5 @@ export async function codeToExcalidraw(
 
 	const elements = convertToExcalidrawElements([rect, ...skeletons])
 
-	return {
-		type: 'excalidraw',
-		version: 2,
-		source: 'https://excalidraw.com',
-		elements,
-		appState: { gridSize: 20, viewBackgroundColor: '#ffffff' },
-		files: {},
-	}
+	return { elements }
 }

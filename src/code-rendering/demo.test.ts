@@ -8,12 +8,12 @@ const code = `interface StreamCardView{
   status: string | null
 }`
 
-const result = await codeToExcalidraw(code, 'typescript')
+const { elements } = await codeToExcalidraw(code, 'typescript')
 
-// Verify metadata round-trip
-const rectMeta = result.elements[0].customData
-console.error('Meta:', JSON.stringify(rectMeta, null, 2))
-console.error('Source round-trip OK:', rectMeta.source === code)
-console.error('Elements:', result.elements.length)
+// Verify metadata round-trip via rect element (index 0)
+const frameMeta = elements[0].customData
+console.error('Meta:', JSON.stringify(frameMeta, null, 2))
+console.error('Source round-trip OK:', frameMeta.source === code)
+console.error('Elements:', elements.length)
 
-console.log(JSON.stringify(result, null, 2))
+console.log(JSON.stringify(elements, null, 2))
