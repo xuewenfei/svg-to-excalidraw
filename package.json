@@ -48,7 +48,8 @@
 		"odiff-bin": "^4.3.8",
 		"playwright-odiff": "^4.4.0-beta.1",
 		"tsdown": "^0.22.0",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"unrun": "^0.3.0"
 	},
 	"peerDependencies": {
 		"@excalidraw/excalidraw": "^0.18.0",
