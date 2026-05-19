@@ -4,7 +4,7 @@ const config: UserConfig = defineConfig({
 	entry: ['./src/index.ts'],
 	format: ['esm'],
 	dts: true,
-	external: [/\.json$/, /\.scss$/, /\.css$/],
+	external: ['@excalidraw/excalidraw', /\.json$/, /\.scss$/, /\.css$/],
 outExtensions: () => ({ js: '.js', dts: '.d.ts' }),
 })
 
