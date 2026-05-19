@@ -74,7 +74,6 @@ export const convert = (svgString: string): ConversionResult => {
 		if (skippedElements.size > 0) {
 			const skippedList = Array.from(skippedElements).join(', ')
 			const warning = `Skipped unsupported elements: ${skippedList}`
-			console.warn(warning)
 			warnings.push(warning)
 		}
 
