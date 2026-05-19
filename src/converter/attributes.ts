@@ -174,13 +174,16 @@ export function filterAttrsToElementValues(el: Element): FilterAttrs {
 }
 
 export function pointsAttrToPoints(el: Element): number[][] {
-	let points: number[][] = []
-
-	if (has(el, 'points')) {
-		points = get(el, 'points')
-			.split(' ')
-			.map((p) => p.split(',').map(parseFloat))
+	if (!has(el, 'points')) return []
+	const nums = get(el, 'points')
+		.trim()
+		.split(/[\s,]+/)
+		.filter(Boolean)
+		.map(parseFloat)
+		.filter((n) => !Number.isNaN(n))
+	const points: number[][] = []
+	for (let i = 0; i + 1 < nums.length; i += 2) {
+		points.push([nums[i], nums[i + 1]])
 	}
-
 	return points
 }
