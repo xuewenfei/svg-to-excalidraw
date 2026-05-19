@@ -1,6 +1,6 @@
 {
 	"name": "headless-svg-to-excalidraw",
-	"version": "0.0.19",
+	"version": "0.0.20",
 	"description": "Convert SVG to Excalidraw's file format, no browser required.",
 	"type": "module",
 	"publishConfig": {
