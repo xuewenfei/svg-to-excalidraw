@@ -5,7 +5,7 @@ const config: UserConfig = defineConfig({
 	format: ['esm'],
 	dts: true,
 	external: ['@excalidraw/excalidraw', /\.json$/, /\.scss$/, /\.css$/],
-outExtensions: () => ({ js: '.js', dts: '.d.ts' }),
+	outExtensions: () => ({ js: '.js', dts: '.d.ts' }),
 })
 
 export default config

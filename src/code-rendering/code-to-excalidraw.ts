@@ -1,9 +1,9 @@
+import type {
+	convertToExcalidrawElements as _convertToExcalidrawElements,
+	ExcalidrawElementSkeleton,
+} from '@excalidraw/excalidraw/data/transform'
 import { nanoid } from 'nanoid'
 import { type BundledLanguage, createHighlighter } from 'shiki'
-import type {
-	ExcalidrawElementSkeleton,
-	convertToExcalidrawElements as _convertToExcalidrawElements,
-} from '@excalidraw/excalidraw/data/transform'
 
 /** Raw Excalidraw elements array, ready to embed into any scene. */
 export type CodeBlockElements = ReturnType<typeof _convertToExcalidrawElements>
@@ -42,10 +42,11 @@ function fillDefaults(skeleton: ExcalidrawElementSkeleton, i: number) {
 	return { ...skeleton, ...base }
 }
 
-function convertToExcalidrawElements(skeletons: ExcalidrawElementSkeleton[]): CodeBlockElements {
+function convertToExcalidrawElements(
+	skeletons: ExcalidrawElementSkeleton[],
+): CodeBlockElements {
 	return skeletons.map((s, i) => fillDefaults(s, i)) as CodeBlockElements
 }
-
 
 /**
  * The result of `codeToExcalidraw`.
@@ -164,14 +165,23 @@ export async function codeToExcalidraw(
 				return
 			}
 			skeletons.push(
-				textSkeleton(nanoid(), token.content, x, y, token.color ?? '#d4d4d4', groupId),
+				textSkeleton(
+					nanoid(),
+					token.content,
+					x,
+					y,
+					token.color ?? '#d4d4d4',
+					groupId,
+				),
 			)
 			x += token.content.length * CHAR_WIDTH
 		})
 	})
 
 	const maxX = Math.max(...skeletons.map((el) => (el.x ?? 0) + (el.width ?? 0)))
-	const maxY = Math.max(...skeletons.map((el) => (el.y ?? 0) + (el.height ?? 0)))
+	const maxY = Math.max(
+		...skeletons.map((el) => (el.y ?? 0) + (el.height ?? 0)),
+	)
 
 	const meta = {
 		type: 'code-block',
