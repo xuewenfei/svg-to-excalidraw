@@ -1,11 +1,50 @@
-import { convertToExcalidrawElements } from '@excalidraw/excalidraw'
 import { nanoid } from 'nanoid'
 import { type BundledLanguage, createHighlighter } from 'shiki'
-
-type ExcalidrawElementSkeleton = Parameters<typeof convertToExcalidrawElements>[0][number]
+import type {
+	ExcalidrawElementSkeleton,
+	convertToExcalidrawElements as _convertToExcalidrawElements,
+} from '@excalidraw/excalidraw/data/transform'
 
 /** Raw Excalidraw elements array, ready to embed into any scene. */
-export type CodeBlockElements = ReturnType<typeof convertToExcalidrawElements>
+export type CodeBlockElements = ReturnType<typeof _convertToExcalidrawElements>
+
+// fractional-indexing compatible: "a0".."a9", "aA".."aZ", "aa".."az" (62 slots), then "b0"..
+const IDX = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+function elementIndex(i: number): string {
+	const hi = Math.floor(i / IDX.length)
+	const lo = i % IDX.length
+	return `${String.fromCharCode(97 + hi)}${IDX[lo]}`
+}
+
+function fillDefaults(skeleton: ExcalidrawElementSkeleton, i: number) {
+	const base = {
+		frameId: null as null,
+		index: elementIndex(i),
+		seed: Math.floor(Math.random() * 2 ** 31),
+		version: 2 as const,
+		versionNonce: Math.floor(Math.random() * 2 ** 31),
+		isDeleted: false as const,
+		boundElements: null as null,
+		updated: Date.now(),
+		link: null as null,
+		locked: false as const,
+	}
+	if (skeleton.type === 'text') {
+		return {
+			...skeleton,
+			...base,
+			lineHeight: 1.2,
+			originalText: skeleton.text,
+			autoResize: true as const,
+			containerId: null as null,
+		}
+	}
+	return { ...skeleton, ...base }
+}
+
+function convertToExcalidrawElements(skeletons: ExcalidrawElementSkeleton[]): CodeBlockElements {
+	return skeletons.map((s, i) => fillDefaults(s, i)) as CodeBlockElements
+}
 
 
 /**

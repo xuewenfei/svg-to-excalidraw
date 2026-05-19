@@ -1,5 +1,4 @@
 // --- test ---
-import './browser-shim.ts'
 import { codeToExcalidraw } from './code-to-excalidraw.ts'
 
 const code = `interface StreamCardView{

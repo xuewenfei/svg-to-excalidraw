@@ -1,4 +1,3 @@
-import './browser-shim.ts'
 import type { BundledLanguage } from 'shiki'
 import { codeToExcalidraw } from './code-to-excalidraw.ts'
 
