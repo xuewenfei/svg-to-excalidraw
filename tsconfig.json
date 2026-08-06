@@ -1,0 +1,13 @@
+{
+	"extends": "@tsconfig/bun/tsconfig.json",
+	"compilerOptions": {
+		"lib": ["dom", "es2020"],
+		"allowJs": false,
+		"strict": false,
+		"declaration": true,
+		"isolatedDeclarations": true,
+		"allowImportingTsExtensions": true
+	},
+	"include": ["src", "tests"],
+	"exclude": ["tsdown.config.ts"]
+}

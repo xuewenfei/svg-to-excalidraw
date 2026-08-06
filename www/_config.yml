@@ -1,0 +1,4 @@
+title: headless-svg-to-excalidraw
+description: Convert SVG to Excalidraw format without a browser
+theme: minima
+baseurl: /headless-svg-to-excalidraw

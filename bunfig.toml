@@ -1,0 +1,5 @@
+[test]
+pathIgnorePatterns = ["tests/visual/**"]
+
+[install]
+minimumReleaseAge = 259200 # seconds
