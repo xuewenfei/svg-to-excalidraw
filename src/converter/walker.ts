@@ -465,9 +465,27 @@ const walkers = {
 
 		const mat = getTransformMatrix(el, groups)
 
-		const m = mat4.fromValues(w, 0, 0, 0, 0, h, 0, 0, 0, 0, 1, 0, x, y, 0, 1)
+		// Transform the rectangle center and decompose scale/rotation.
+		// This produces correct results for translate + rotate + uniform scale,
+		// which is the common case for SVG icons/diagrams.
+		const localCenterX = x + w / 2
+		const localCenterY = y + h / 2
+		const worldCenter = vec3.transformMat4(
+			vec3.create(),
+			vec3.fromValues(localCenterX, localCenterY, 1),
+			mat,
+		)
 
-		const result = mat4.multiply(mat4.create(), mat, m)
+		const a = mat[0]
+		const b = mat[1]
+		const c = mat[4]
+		const d = mat[5]
+		const scaleX = Math.hypot(a, b)
+		const scaleY = Math.hypot(c, d)
+		const rotation = scaleX === 0 ? 0 : Math.atan2(b, a)
+		const uniformScale = Math.sqrt(Math.max(scaleX * scaleY, 0)) || 1
+		const scaledWidth = w * uniformScale
+		const scaledHeight = h * uniformScale
 
 		/*
 		NOTE: Currently there doesn't seem to be a way to specify the border
@@ -479,10 +497,11 @@ const walkers = {
 		const rect: ExcalidrawRectangle = {
 			...createExRect(),
 			...presAttrs(el, groups),
-			x: result[12],
-			y: result[13],
-			width: result[0],
-			height: result[5],
+			x: worldCenter[0] - scaledWidth / 2,
+			y: worldCenter[1] - scaledHeight / 2,
+			width: scaledWidth,
+			height: scaledHeight,
+			angle: rotation,
 			strokeSharpness: isRound ? 'round' : 'sharp',
 		}
 
