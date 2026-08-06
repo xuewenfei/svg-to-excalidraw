@@ -80,13 +80,16 @@ const isCJK = (char: string): boolean => {
 }
 
 const measureTextWidth = (text: string, fontSize: number): number => {
-	const cjkWidth = fontSize * 0.95
-	const latinWidth = fontSize * 0.55
+	// CJK glyphs and punctuation are usually wider than the nominal em square in
+	// Excalidraw's fallback fonts, so leave extra headroom to avoid clipping.
+	const cjkWidth = fontSize * 1.2
+	const latinWidth = fontSize * 0.6
 	let width = 0
 	for (const char of text) {
 		width += isCJK(char) ? cjkWidth : latinWidth
 	}
-	return Math.max(width, fontSize)
+	// Add a small buffer for font metrics differences between SVG and canvas.
+	return Math.max(width + fontSize * 0.2, fontSize)
 }
 
 const nodeValidator = (node: Node): number => {
